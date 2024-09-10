@@ -1,60 +1,31 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const session = require('express-session');
 const jwt = require('jsonwebtoken');
+const session = require('express-session')
+const customer_routes = require('./router/auth_users.js').authenticated;
+const genl_routes = require('./router/general.js').general;
+
 const app = express();
-const public_users = require('./router/public_users.js').general;
-let users = require('./router/auth_users.js').users;
-let isValid = require('./router/auth_users.js').isValid;
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
 
-// Use session middleware for session management
-app.use(session({
-  secret: 'your_secret_key',
-  resave: false,
-  saveUninitialized: true
-}));
+app.use("/customer",session({secret:"fingerprint_customer",resave: true, saveUninitialized: true}))
 
-// Middleware for checking authentication using token
-app.use("/customer/auth/*", function auth(req, res, next) {
-  const token = req.headers['authorization'];
-
-  if (!token) {
-    return res.status(401).json({ message: "Access token required" });
-  }
-
-  jwt.verify(token, 'your_secret_key', (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ message: "Invalid token" });
+app.use("/customer/auth/*", function auth(req,res,next){
+    console.log(typeof(req.query.password));
+    // Check if the password query parameter matches the expected value
+    if (req.query.password !== "pwd1234") {
+        // Send an error response if the password does not match
+        return res.status(402).send("This user cannot login ");
     }
-    req.user = decoded;
+    // Log the current time
+    console.log('Time:', Date.now());
+    // Call the next middleware function
     next();
-  });
 });
+ 
+const PORT =3000;
 
-// Public user routes (non-authenticated)
-app.use('/public', public_users);
+app.use("/customer", customer_routes);
+app.use("/", genl_routes);
 
-// Example login route to generate token
-app.post('/login', (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ message: "Username and password required" });
-  }
-
-  if (isValid(username, password)) {
-    const token = jwt.sign({ username }, 'your_secret_key', { expiresIn: '1h' });
-    return res.json({ token });
-  } else {
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
-});
-
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT,()=>console.log("Server is running"));
